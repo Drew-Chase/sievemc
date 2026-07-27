@@ -1,0 +1,11 @@
+[package]
+name = "sievemc_desktop"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90.0"
+
+[[bin]]
+name="sievemc"
+path = "src/main.rs"
+
+[dependencies]
