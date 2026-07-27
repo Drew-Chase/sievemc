@@ -3,6 +3,14 @@ name = "sievemc_cli"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.90.0"
+description = "CLI tool for filtering Minecraft mod JARs by side (client, server, or both) into directories or zip archives"
+authors = ["Drew Chase"]
+license = "MIT"
+repository = "https://github.com/drew-chase/sievemc"
+homepage = "https://github.com/drew-chase/sievemc"
+keywords = ["minecraft", "modpack", "mods", "cli", "filter"]
+categories = ["command-line-utilities", "game-development"]
+readme = "../../README.md"
 
 [dependencies]
 sievemc = { package = "sievemc_lib", path = "../lib" }
