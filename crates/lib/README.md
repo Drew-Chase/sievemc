@@ -20,9 +20,9 @@ Two public entry points:
 
 ```rust
 pub enum Side {
-    ClientOnly,
-    ServerOnly,
-    ClientAndServer,
+	ClientOnly,
+	ServerOnly,
+	ClientAndServer,
 }
 ```
 
@@ -35,11 +35,11 @@ Files that are not recognised mod JARs (no `fabric.mod.json`, `neoforge.mods.tom
 ```rust
 use sievemc::{get_mod_file_side, Side};
 
-let side = get_mod_file_side("mods/sodium.jar")?;
+let side = get_mod_file_side("mods/sodium.jar") ?;
 match side {
-    Side::ClientOnly      => println!("client-only"),
-    Side::ServerOnly      => println!("server-only"),
-    Side::ClientAndServer => println!("both sides"),
+Side::ClientOnly      => println!("client-only"),
+Side::ServerOnly      => println!("server-only"),
+Side::ClientAndServer => println!("both sides"),
 }
 ```
 
@@ -48,9 +48,9 @@ match side {
 ```rust
 use sievemc::{get_many_mod_file_sides, Side};
 
-let sides = get_many_mod_file_sides("mods/")?;
-for (path, side) in &sides {
-    println!("{:?}  {:?}", path, side);
+let sides = get_many_mod_file_sides("mods/") ?;
+for (path, side) in & sides {
+println!("{:?}  {:?}", path, side);
 }
 ```
 
@@ -59,13 +59,13 @@ The scan uses [`rayon`](https://docs.rs/rayon) for parallel processing when ther
 ### Filtering to one side
 
 ```rust
-let client_mods: Vec<_> = sides
-    .iter()
-    .filter(|(_, side)| {
-        **side == Side::ClientOnly || **side == Side::ClientAndServer
-    })
-    .map(|(path, _)| path)
-    .collect();
+let client_mods: Vec<_ > = sides
+.iter()
+.filter( | (_, side)| {
+* * side == Side::ClientOnly | | ** side == Side::ClientAndServer
+})
+.map( | (path, _) | path)
+.collect();
 ```
 
 ## Error handling
@@ -74,14 +74,14 @@ All fallible functions return `Result<_, SieveError>`:
 
 ```rust
 pub enum SieveError {
-    IOError(std::io::Error),
-    MissingSchemaProperty(String),
-    FileMissingSchemaProperty(PathBuf, String),
-    FileMissingEntry(PathBuf, String),
-    DeserializationError(serde_json::Error),
-    ZipError(zip::result::ZipError),
-    Utf8Error(std::str::Utf8Error),
-    TomlError(toml::de::Error),
+	IOError(std::io::Error),
+	MissingSchemaProperty(String),
+	FileMissingSchemaProperty(PathBuf, String),
+	FileMissingEntry(PathBuf, String),
+	DeserializationError(serde_json::Error),
+	ZipError(zip::result::ZipError),
+	Utf8Error(std::str::Utf8Error),
+	TomlError(toml::de::Error),
 }
 ```
 
@@ -98,10 +98,6 @@ Reads `dependencies.<modId>[].side` for the entry whose `modId` matches the load
 
 ## Environment variable
 
-| Variable | Default | Description |
-|---|---|---|
-| `SIEVEMC_MULTITHREAD_THREASHOLD` | `10` | File count above which parallel processing is used |
-
-## License
-
-MIT
+| Variable                         | Default | Description                                        |
+|----------------------------------|---------|----------------------------------------------------|
+| `SIEVEMC_MULTITHREAD_THREASHOLD` | `10`    | File count above which parallel processing is used |

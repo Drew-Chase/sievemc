@@ -26,11 +26,11 @@ sievemc_cli [OPTIONS] <INPUT>
 
 ## Options
 
-| Flag | Short | Values | Default | Description |
-|---|---|---|---|---|
-| `--output-type` | | `terminal`, `directory`, `archive` | `terminal` | How results are output |
-| `--output` | `-o` | path | — | Output path (required for `directory` and `archive`) |
-| `--side` | `-s` | `client`, `server`, `both` | `both` | Which side to include |
+| Flag            | Short | Values                             | Default    | Description                                          |
+|-----------------|-------|------------------------------------|------------|------------------------------------------------------|
+| `--output-type` |       | `terminal`, `directory`, `archive` | `terminal` | How results are output                               |
+| `--output`      | `-o`  | path                               | —          | Output path (required for `directory` and `archive`) |
+| `--side`        | `-s`  | `client`, `server`, `both`         | `both`     | Which side to include                                |
 
 ## Output modes
 
@@ -97,7 +97,3 @@ RUST_LOG=warn sievemc_cli /path/to/mods
 ## Supported mod loaders
 
 Fabric, NeoForge, and Forge. See the [library README](../lib/README.md) for detection details.
-
-## License
-
-MIT
