@@ -1,0 +1,9 @@
+[workspace]
+resolver = "3"
+members = ["crates/lib", "crates/cli", "crates/desktop"]
+
+[profile.release]
+lto = true
+panic = "abort"
+codegen-units = 1
+opt-level = "s"
