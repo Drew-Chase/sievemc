@@ -18,6 +18,23 @@
     --color-side-unsure: #e0b843;    /* amber — undetected, needs review */
 }
 
+/* Theme-switchable colors: register the utility names here so Tailwind
+   emits bg-surface-2, text-muted, border-border, etc. `inline` makes the
+   utilities reference the variable by name, so the per-theme values set in
+   :root / [data-theme="light"] below actually take effect at runtime. */
+@theme inline {
+    --color-surface: var(--surface);
+    --color-surface-foreground: var(--surface-foreground);
+    --color-surface-2: var(--surface-2);
+    --color-surface-3: var(--surface-3);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-border: var(--border);
+    --color-border-strong: var(--border-strong);
+}
+
 /* HeroUI v3 tokens (un-layered :root declarations win over HeroUI's layered defaults).
    App is dark-first: :root == dark. */
 :root,
