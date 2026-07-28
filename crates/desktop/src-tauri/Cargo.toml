@@ -38,3 +38,5 @@ color-eyre = { version = "0.6.5", features = ["tracing-error", "track-caller"] }
 chrono = { version = "0.4.45" }
 tar = "0.4.43"
 xz2 = "0.1.7"
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
