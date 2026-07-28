@@ -1,0 +1,278 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@import "tailwindcss";
+@import "@heroui/styles";
+
+/* SieveMC theme — green/black high-contrast, dark-first.
+   Fonts: Space Grotesk (UI) + JetBrains Mono (paths, versions, evidence, logs). */
+@theme {
+    --font-sans: 'Space Grotesk', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    /* Brand palette (exposed as Tailwind colors: bg-brand, text-side-client, etc.) */
+    --color-brand: #43e05c;          /* primary green — server side, CTAs */
+    --color-brand-dim: #2ea344;      /* pressed / hover-darker */
+    --color-side-client: #43cfe0;    /* cyan — client-only */
+    --color-side-server: #43e05c;    /* green — server-only */
+    --color-side-both: #a9b3ac;      /* neutral — both sides */
+    --color-side-unsure: #e0b843;    /* amber — undetected, needs review */
+}
+
+/* HeroUI v3 tokens (un-layered :root declarations win over HeroUI's layered defaults).
+   App is dark-first: :root == dark. */
+:root,
+.dark,
+[data-theme="dark"] {
+    --accent: #43e05c;
+    --accent-foreground: #07130a; /* near-black on green */
+
+    --background: #0b0d0c; /* window background */
+    --foreground: #e9efe9; /* primary text */
+
+    /* Surfaces (cards, rails, inputs) */
+    --surface: #121614; /* card / panel */
+    --surface-foreground: #e9efe9;
+    --surface-2: #0f1210; /* inputs, code/log wells */
+    --surface-3: #161b18; /* hover / selected tiles */
+
+    --muted: #1c2420; /* icon placeholder blocks */
+    --muted-foreground: rgba(233, 239, 234, 0.5);
+
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+
+    --success: #43e05c;
+    --success-foreground: #07130a;
+    --warning: #e0b843;
+    --warning-foreground: #131006;
+    --danger: #e05c5c;
+    --danger-foreground: #ffffff;
+    --info: #43cfe0;
+    --info-foreground: #06181b;
+
+    --focus: #43e05c;
+    --radius: 0.5rem; /* 8px — buttons, inputs; cards use ~10-12px */
+}
+
+/* Light theme (secondary — the app ships dark by default) */
+[data-theme="light"]:not(.dark) {
+    --accent: #1a8f36; /* darker green for contrast on light */
+    --accent-foreground: #ffffff;
+
+    --background: #edefec;
+    --foreground: #141815;
+
+    --surface: #ffffff;
+    --surface-foreground: #141815;
+    --surface-2: #f4f6f3;
+    --surface-3: #e6eae5;
+
+    --muted: #dde2dd;
+    --muted-foreground: rgba(20, 24, 21, 0.55);
+
+    --border: rgba(0, 0, 0, 0.1);
+    --border-strong: rgba(0, 0, 0, 0.22);
+
+    --success: #1a8f36;
+    --success-foreground: #ffffff;
+    --warning: #a37b12;
+    --warning-foreground: #ffffff;
+    --danger: #c23838;
+    --danger-foreground: #ffffff;
+    --info: #0e7490;
+    --info-foreground: #ffffff;
+
+    --focus: #1a8f36;
+}
+
+:root {
+    --scrollbar-background-color: transparent;
+    --scrollbar-thumb-color: rgba(67, 224, 92, 0.55);
+    --scrollbar-thumb-hover-color: #43e05c;
+    overflow: auto;
+    scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-background-color);
+    scrollbar-width: thin;
+}
+
+body {
+    font-family: 'Space Grotesk', sans-serif;
+    background-color: var(--background);
+    color: var(--foreground);
+}
+
+/* Paths, filenames, versions, evidence strings, logs */
+code, kbd, samp, pre {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+::-webkit-scrollbar {
+    width: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-background-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb-color);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover-color);
+}
+
+::selection {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+}
+
+::placeholder {
+    color: color-mix(in srgb, var(--foreground) 40%, transparent);
+    font-weight: 400;
+}
+
+/* ---------------------------------------------------------------------------
+   Text styles — composed utilities matching the mockups.
+   Usage: <div class="text-description">…</div>
+   Each sets font family, size, weight, spacing, and color; they follow the
+   active theme via tokens. Override color per-instance with a color utility.
+--------------------------------------------------------------------------- */
+
+/* Custom titlebar app name: "SIEVEMC" */
+@utility text-titlebar {
+    font-family: var(--font-sans), sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--foreground) 70%, transparent);
+}
+
+/* Big start-screen headline */
+@utility text-hero {
+    font-family: var(--font-sans), sans-serif;
+    font-size: 44px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 1.05;
+    color: var(--foreground);
+}
+
+/* Screen heading: "Export", "Settings", "Server jar downloader" */
+@utility text-page-title {
+    font-family: var(--font-sans), sans-serif;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    color: var(--foreground);
+}
+
+/* Uppercase mono group label: "SIDE", "OUTPUT TYPE", "RECENT FOLDERS" */
+@utility text-section-label {
+    font-family: var(--font-mono), monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--foreground) 40%, transparent);
+}
+
+/* Card / row / mod name */
+@utility text-card-title {
+    font-family: var(--font-sans), sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+/* Default body copy */
+@utility text-body {
+    font-family: var(--font-sans), sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--foreground);
+}
+
+/* Secondary copy under titles and controls */
+@utility text-description {
+    font-family: var(--font-sans), sans-serif;
+    font-size: 12.5px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: color-mix(in srgb, var(--foreground) 50%, transparent);
+}
+
+/* Small tertiary text: counts, timestamps, "sieved 2d ago" */
+@utility text-caption {
+    font-family: var(--font-sans), sans-serif;
+    font-size: 11.5px;
+    font-weight: 400;
+    color: color-mix(in srgb, var(--foreground) 45%, transparent);
+}
+
+/* File paths, jar filenames, versions */
+@utility text-path {
+    font-family: var(--font-mono), monospace;
+    font-size: 11.5px;
+    font-weight: 400;
+    color: color-mix(in srgb, var(--foreground) 40%, transparent);
+}
+
+/* Detection evidence: "fabric.mod.json → client" */
+@utility text-evidence {
+    font-family: var(--font-mono), monospace;
+    font-size: 11px;
+    font-weight: 400;
+    color: color-mix(in srgb, var(--foreground) 40%, transparent);
+}
+
+/* Scan/export log lines */
+@utility text-log {
+    font-family: var(--font-mono), monospace;
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.9;
+    color: color-mix(in srgb, var(--foreground) 45%, transparent);
+}
+
+/* Side badge label: CLIENT / SERVER / BOTH / UNSURE (pair with a side color) */
+@utility text-badge {
+    font-family: var(--font-sans), sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+/* Button labels */
+@utility text-button {
+    font-family: var(--font-sans), sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Inline text links / secondary actions */
+@utility text-link {
+    font-family: var(--font-sans), sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+}
+
+/* Big stat numbers: "24.6 GB", "142" */
+@utility text-stat {
+    font-family: var(--font-sans), sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--foreground);
+}
+
+/* Footer / version stamp: "v0.1.0 · rust core · windows" */
+@utility text-version {
+    font-family: var(--font-mono), monospace;
+    font-size: 11px;
+    font-weight: 400;
+    color: color-mix(in srgb, var(--foreground) 30%, transparent);
+}
