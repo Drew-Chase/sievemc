@@ -14,13 +14,14 @@ dist: build
     @Compress-Archive -Path target/release/sievemc.exe -DestinationPath target/dist/cli.zip -Force
 
 build:
-    @cargo build --workspace --release
+    @cargo build --package sievemc_cli --release
+    @cargo tauri build
 
 clean:
     @cargo clean
 dev:desktop
 desktop:install
-    @cargo tauri dev
+    @cargo tauri dev --no-watch
 
 [working-directory: './crates/desktop']
 install:
