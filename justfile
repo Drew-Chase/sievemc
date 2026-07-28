@@ -18,3 +18,12 @@ build:
 
 clean:
     @cargo clean
+
+cli args:
+    @cargo run --package sievemc_cli -q -- {{ args }}
+
+help:
+    @cargo run --package sievemc_cli -q -- --help
+
+gen-icon:
+    @cargo tauri icon .\crates\desktop\src-tauri\icons\sievemc-icon.svg
