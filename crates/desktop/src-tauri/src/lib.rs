@@ -1,14 +1,10 @@
 use tracing::{debug, error, info, trace, warn};
 
+mod app_info_commands;
 mod util;
+use app_info_commands::get_versions;
 
 pub static DEBUG: bool = cfg!(debug_assertions);
-
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
 
 /// Bridge for webview-side logging.
 ///
@@ -43,8 +39,10 @@ pub fn run() {
     );
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![greet, log])
+        .invoke_handler(tauri::generate_handler![get_versions, log])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
