@@ -18,6 +18,13 @@ build:
 
 clean:
     @cargo clean
+dev:desktop
+desktop:install
+    @cargo tauri dev
+
+[working-directory: './crates/desktop']
+install:
+    @pnpm i
 
 cli args:
     @cargo run --package sievemc_cli -q -- {{ args }}
