@@ -1,0 +1,40 @@
+[package]
+name = "sievemc_desktop"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90.0"
+description = "Desktop app for filtering Minecraft mod JARs by side (client, server, or both)"
+authors = ["Drew Chase"]
+license = "MIT"
+repository = "https://github.com/drew-chase/sievemc"
+homepage = "https://github.com/drew-chase/sievemc"
+keywords = ["minecraft", "modpack", "mods", "tauri", "gui"]
+categories = ["gui", "game-development"]
+readme = "../../../README.md"
+
+[[bin]]
+name="sievemc"
+path = "src/main.rs"
+
+[lib]
+name = "sievemc_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+walkdir = "2.5.0"
+chrono = { version = "0.4.45" }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+tracing = { version = "0.1.44", features = ["max_level_trace"] }
+tracing-subscriber = { version = "0.3.19", features = ["json", "env-filter"] }
+color-eyre = { version = "0.6.5", features = ["tracing-error", "track-caller"] }
+
+chrono = { version = "0.4.45" }
+tar = "0.4.43"
+xz2 = "0.1.7"

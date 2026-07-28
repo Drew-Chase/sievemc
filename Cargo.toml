@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/lib", "crates/cli", "crates/desktop"]
+members = ["crates/lib", "crates/cli", "crates/desktop/src-tauri"]
 
 [profile.release]
 lto = true
