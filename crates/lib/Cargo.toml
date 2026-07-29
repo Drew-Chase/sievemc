@@ -1,6 +1,6 @@
 [package]
 name = "sievemc_lib"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
 rust-version = "1.90.0"
 description = "Utility functions to detect and filter Minecraft mod JARs by side (client, server, or both)"
