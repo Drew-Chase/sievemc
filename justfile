@@ -6,7 +6,7 @@ desktop_version:=`uv --path ./crates/desktop --current`
 default:
     @just --list
 
-dist: dist-os && dist-docker
+dist: dist-os dist-docker
 
 [windows]
 dist-os: build
