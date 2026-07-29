@@ -7,6 +7,8 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/lib/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/lib/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/desktop/src-tauri/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/.pnpm-store" />
+      <excludeFolder url="file://$MODULE_DIR$/crates/desktop/src-tauri/gen/schemas" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
