@@ -6,8 +6,10 @@ desktop_version:=`uv --path ./crates/desktop --current`
 default:
     @just --list
 
+dist: dist-os && dist-docker
+
 [windows]
-dist: build
+dist-os: build
     @New-Item -Type Directory target/dist -Force
     @Compress-Archive -Path target/release/sievemc.exe,target/release/sievemc_cli.exe -DestinationPath target/dist/sievemc-windows-x86_64-v{{desktop_version}}.zip -Force
     @Write-Host "Zipping Desktop"
@@ -17,7 +19,7 @@ dist: build
     @Compress-Archive -Path target/release/sievemc.exe -DestinationPath target/dist/sievemc-cli-windows-x86_64-v{{cli_version}}.zip -Force
 
 [linux]
-dist: build
+dist-os: build
     @mkdir -p target/dist
     @cd target/release && zip -j ../dist/sievemc-linux-x86_64-v{{desktop_version}}.zip sievemc sievemc_cli
     @echo "Zipping Desktop"
@@ -27,7 +29,7 @@ dist: build
     @cd target/release && zip -j ../dist/sievemc-cli-linux-x86_64-v{{cli_version}}.zip sievemc
 
 [macos]
-dist: build
+dist-os: build
     @mkdir -p target/dist
     @cd target/release && zip -j ../dist/sievemc-macos-x86_64-v{{desktop_version}}.zip sievemc sievemc_cli
     @echo "Zipping Desktop"
