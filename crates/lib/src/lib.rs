@@ -1,5 +1,6 @@
 use rayon::prelude::*;
 use serde::de::Error as _;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -27,7 +28,8 @@ pub enum SieveError {
     TomlError(#[from] toml::de::Error),
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Side {
     ClientOnly,
     ServerOnly,
@@ -146,6 +148,301 @@ pub fn get_mod_file_side(file: impl AsRef<Path>) -> Result<Side, SieveError> {
     }
 }
 
+/// Rich, non-fatal detection result for a single mod jar.
+///
+/// Unlike [`get_mod_file_side`], detection never fails here: a jar whose side
+/// can't be determined is returned with `side == None` and a human-readable
+/// `evidence` string, so the desktop UI can surface it as "Unsure" for review.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModDetection {
+    /// Absolute (or as-given) path to the jar.
+    pub path: PathBuf,
+    /// Just the file name, e.g. `sodium-fabric-0.6.13.jar`.
+    pub filename: String,
+    /// Detected side, or `None` when it couldn't be determined ("unsure").
+    pub side: Option<Side>,
+    /// Human-readable reason, e.g. `fabric.mod.json → client`.
+    pub evidence: String,
+    /// Which loader manifest was found, if any: `fabric` / `forge` / `neoforge`.
+    pub loader: Option<String>,
+}
+
+fn side_label(side: &Side) -> &'static str {
+    match side {
+        Side::ClientOnly => "client",
+        Side::ServerOnly => "server",
+        Side::ClientAndServer => "both",
+    }
+}
+
+/// Inspect a single jar and report its side, never erroring.
+///
+/// This mirrors the manifest-detection branches in [`get_mod_file_side`] but
+/// additionally captures the evidence string and originating loader, and maps
+/// any failure to an "unsure" result (`side: None`) instead of an `Err`.
+pub fn detect_mod(path: impl AsRef<Path>) -> ModDetection {
+    let path = path.as_ref();
+    let filename = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let (side, evidence, loader) = inspect_mod(path);
+    debug!(
+        "Detected {} for {}: {}",
+        side.as_ref().map(side_label).unwrap_or("unsure"),
+        path.display(),
+        evidence
+    );
+    ModDetection {
+        path: path.to_path_buf(),
+        filename,
+        side,
+        evidence,
+        loader,
+    }
+}
+
+fn inspect_mod(path: &Path) -> (Option<Side>, String, Option<String>) {
+    let file = match File::open(path) {
+        Ok(f) => f,
+        Err(e) => return (None, format!("could not open jar: {e}"), None),
+    };
+    let mut archive = match zip::ZipArchive::new(file) {
+        Ok(a) => a,
+        Err(e) => return (None, format!("not a valid jar: {e}"), None),
+    };
+
+    if let Ok(entry) = archive.by_name("fabric.mod.json") {
+        let parsed = serde_json::from_reader(entry)
+            .map_err(SieveError::from)
+            .and_then(get_json_schema_side);
+        return match parsed {
+            Ok(side) => {
+                let evidence = format!("fabric.mod.json → {}", side_label(&side));
+                (Some(side), evidence, Some("fabric".to_string()))
+            }
+            Err(_) => (
+                None,
+                "fabric.mod.json → no side metadata found".to_string(),
+                Some("fabric".to_string()),
+            ),
+        };
+    }
+
+    if let Some(buf) = read_archive_entry(&mut archive, "META-INF/neoforge.mods.toml")
+        .or_else(|| read_archive_entry(&mut archive, "neoforge.mods.toml"))
+    {
+        return toml_detection(&buf, "neoforge", "neoforge.mods.toml");
+    }
+
+    if let Some(buf) = read_archive_entry(&mut archive, "META-INF/mods.toml")
+        .or_else(|| read_archive_entry(&mut archive, "mods.toml"))
+    {
+        return toml_detection(&buf, "forge", "mods.toml");
+    }
+
+    (None, "no side metadata found".to_string(), None)
+}
+
+fn toml_detection(buf: &[u8], loader: &str, manifest: &str) -> (Option<Side>, String, Option<String>) {
+    let text = match from_utf8(buf) {
+        Ok(t) => t,
+        Err(_) => {
+            return (
+                None,
+                format!("{manifest} → not valid UTF-8"),
+                Some(loader.to_string()),
+            );
+        }
+    };
+    let value: toml::Value = match toml::from_str(text) {
+        Ok(v) => v,
+        Err(e) => return (None, format!("{manifest} → parse error: {e}"), Some(loader.to_string())),
+    };
+    match get_loader_toml_side(value, loader) {
+        Ok(side) => {
+            let evidence = format!("{manifest} → {}", side_label(&side));
+            (Some(side), evidence, Some(loader.to_string()))
+        }
+        Err(_) => (
+            None,
+            format!("{manifest} → no side metadata found"),
+            Some(loader.to_string()),
+        ),
+    }
+}
+
+/// Detect the side of every `*.jar` in `directory` (non-recursive), returning a
+/// stable, alphabetically-sorted list. Unlike [`get_many_mod_file_sides`], jars
+/// that can't be classified are retained with `side: None`.
+pub fn detect_mods(directory: impl AsRef<Path>) -> Result<Vec<ModDetection>, SieveError> {
+    let directory = directory.as_ref();
+    info!("Detecting mods in directory: {}", directory.display());
+
+    let mut files: Vec<PathBuf> = std::fs::read_dir(directory)?
+        .filter_map(|f| f.ok().map(|e| e.path()))
+        .filter(|p| {
+            p.is_file()
+                && p.extension()
+                    .and_then(|e| e.to_str())
+                    .map(|e| e.eq_ignore_ascii_case("jar"))
+                    .unwrap_or(false)
+        })
+        .collect();
+    files.sort();
+
+    Ok(files.iter().map(detect_mod).collect())
+}
+
+/// Which side(s) an export cares about. `Both` produces two output sets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExportSide {
+    Client,
+    Server,
+    Both,
+}
+
+/// How the export is materialized on disk.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum OutputType {
+    /// Copy jars into a folder.
+    Directory,
+    /// Bundle jars into a `.zip`.
+    Archive,
+    /// Copy nothing — only report the filename lists.
+    List,
+}
+
+/// A mod plus its *effective* side (after any user override in the UI).
+#[derive(Debug, Clone)]
+pub struct ExportItem {
+    pub path: PathBuf,
+    pub side: Side,
+}
+
+/// Summary of what an export produced, suitable for the "Done" receipt screen.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportReceipt {
+    /// Filenames that went to the client set.
+    pub client: Vec<String>,
+    /// Filenames that went to the server set.
+    pub server: Vec<String>,
+    /// Paths actually written (folders or zips); empty for `List`.
+    pub outputs: Vec<PathBuf>,
+    pub duration_ms: u128,
+}
+
+fn filename_of(path: &Path) -> String {
+    path.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.to_string_lossy().to_string())
+}
+
+fn copy_into_dir(items: &[&ExportItem], dir: &Path) -> Result<(), SieveError> {
+    std::fs::create_dir_all(dir)?;
+    for item in items {
+        let dest = dir.join(filename_of(&item.path));
+        trace!(src = %item.path.display(), dest = %dest.display(), "Copying mod");
+        std::fs::copy(&item.path, dest)?;
+    }
+    Ok(())
+}
+
+fn write_archive(items: &[&ExportItem], zip_path: &Path) -> Result<(), SieveError> {
+    if let Some(parent) = zip_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut writer = zip::ZipWriter::new(File::create(zip_path)?);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Stored);
+    for item in items {
+        writer.start_file(filename_of(&item.path), options)?;
+        let mut reader = File::open(&item.path)?;
+        std::io::copy(&mut reader, &mut writer)?;
+    }
+    writer.finish()?;
+    Ok(())
+}
+
+/// Export `items` (already carrying their effective side) according to `side`
+/// and `output`. For a single-side export, pass the destination as
+/// `dest_client` (client) or `dest_server` (server); for `Both`, provide both.
+///
+/// This is the shared, GUI-friendly counterpart to the copy/zip logic in the
+/// CLI (`crates/cli/src/main.rs`).
+pub fn export_mods(
+    items: &[ExportItem],
+    side: ExportSide,
+    output: OutputType,
+    dest_client: Option<PathBuf>,
+    dest_server: Option<PathBuf>,
+) -> Result<ExportReceipt, SieveError> {
+    let start = std::time::Instant::now();
+    let want_client = matches!(side, ExportSide::Client | ExportSide::Both);
+    let want_server = matches!(side, ExportSide::Server | ExportSide::Both);
+
+    let client_items: Vec<&ExportItem> = items
+        .iter()
+        .filter(|i| matches!(i.side, Side::ClientOnly | Side::ClientAndServer))
+        .collect();
+    let server_items: Vec<&ExportItem> = items
+        .iter()
+        .filter(|i| matches!(i.side, Side::ServerOnly | Side::ClientAndServer))
+        .collect();
+
+    let client_names: Vec<String> = client_items.iter().map(|i| filename_of(&i.path)).collect();
+    let server_names: Vec<String> = server_items.iter().map(|i| filename_of(&i.path)).collect();
+
+    let mut outputs = Vec::new();
+    match output {
+        OutputType::List => {}
+        OutputType::Directory => {
+            if want_client {
+                if let Some(dir) = &dest_client {
+                    copy_into_dir(&client_items, dir)?;
+                    outputs.push(dir.clone());
+                }
+            }
+            if want_server {
+                if let Some(dir) = &dest_server {
+                    copy_into_dir(&server_items, dir)?;
+                    outputs.push(dir.clone());
+                }
+            }
+        }
+        OutputType::Archive => {
+            if want_client {
+                if let Some(zip) = &dest_client {
+                    write_archive(&client_items, zip)?;
+                    outputs.push(zip.clone());
+                }
+            }
+            if want_server {
+                if let Some(zip) = &dest_server {
+                    write_archive(&server_items, zip)?;
+                    outputs.push(zip.clone());
+                }
+            }
+        }
+    }
+
+    let receipt = ExportReceipt {
+        client: if want_client { client_names } else { Vec::new() },
+        server: if want_server { server_names } else { Vec::new() },
+        outputs,
+        duration_ms: start.elapsed().as_millis(),
+    };
+    info!(
+        "Export complete in {}ms: {} client, {} server",
+        receipt.duration_ms,
+        receipt.client.len(),
+        receipt.server.len()
+    );
+    Ok(receipt)
+}
+
 fn read_archive_entry(archive: &mut zip::ZipArchive<File>, name: &str) -> Option<Vec<u8>> {
     let mut entry = archive.by_name(name).ok()?;
     let mut buf = Vec::new();
@@ -250,6 +547,73 @@ fn get_json_schema_side(schema: serde_json::Value) -> Result<Side, SieveError> {
                 "entrypoints or environment".to_string(),
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod detect_test {
+    use super::*;
+
+    #[test]
+    fn detect_client_with_evidence() {
+        let d = detect_mod("../../examples/fabric_clientonly.jar");
+        assert_eq!(d.side, Some(Side::ClientOnly));
+        assert_eq!(d.loader.as_deref(), Some("fabric"));
+        assert!(d.evidence.contains("fabric.mod.json"));
+        assert_eq!(d.filename, "fabric_clientonly.jar");
+    }
+
+    #[test]
+    fn detect_unsure_on_bogus_jar() {
+        // A file that isn't a valid zip/jar must be reported as unsure, not error.
+        let path = std::env::temp_dir().join("sievemc_not_a_jar.jar");
+        std::fs::write(&path, b"this is not a zip archive").unwrap();
+        let d = detect_mod(&path);
+        assert_eq!(d.side, None);
+        assert!(d.loader.is_none());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn export_directory_splits_both_sides() {
+        let out = std::env::temp_dir().join(format!("sievemc_export_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&out);
+        let client_dir = out.join("client");
+        let server_dir = out.join("server");
+
+        let items = vec![
+            ExportItem {
+                path: PathBuf::from("../../examples/fabric_clientonly.jar"),
+                side: Side::ClientOnly,
+            },
+            ExportItem {
+                path: PathBuf::from("../../examples/fabric_serveronly.jar"),
+                side: Side::ServerOnly,
+            },
+            ExportItem {
+                path: PathBuf::from("../../examples/fabric_client_server.jar"),
+                side: Side::ClientAndServer,
+            },
+        ];
+
+        let receipt = export_mods(
+            &items,
+            ExportSide::Both,
+            OutputType::Directory,
+            Some(client_dir.clone()),
+            Some(server_dir.clone()),
+        )
+        .unwrap();
+
+        // both-sides mod lands in each set; each side also gets its exclusive one.
+        assert_eq!(receipt.client.len(), 2);
+        assert_eq!(receipt.server.len(), 2);
+        assert!(client_dir.join("fabric_clientonly.jar").exists());
+        assert!(client_dir.join("fabric_client_server.jar").exists());
+        assert!(server_dir.join("fabric_serveronly.jar").exists());
+        assert!(!client_dir.join("fabric_serveronly.jar").exists());
+
+        let _ = std::fs::remove_dir_all(&out);
     }
 }
 
