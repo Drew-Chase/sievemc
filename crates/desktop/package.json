@@ -15,14 +15,15 @@
     "tauri-build": "tauri build"
   },
   "dependencies": {
-    "@heroui/react": "^3.2.2",
-    "@heroui/styles": "^3.2.2",
+    "@heroui/react": "^3.2.3",
+    "@heroui/styles": "^3.2.3",
     "@iconify-icon/react": "2.3.0",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "~2.7.2",
     "@tauri-apps/plugin-fs": "~2.5.1",
     "@tauri-apps/plugin-opener": "~2.5.4",
     "@tauri-apps/plugin-shell": "^2.3.5",
+    "@tauri-apps/plugin-store": "^2.4.4",
     "framer-motion": "^12.43.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
@@ -42,7 +43,7 @@
     "sass-loader": "16.0.4",
     "tailwindcss": "4.3.1",
     "typescript": "5.7.3",
-    "vite": "^8.1.5"
+    "vite": "^8.2.0"
   },
   "engines": {
     "pnpm": ">=10"
