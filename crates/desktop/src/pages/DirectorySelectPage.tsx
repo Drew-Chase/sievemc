@@ -1,18 +1,24 @@
-import {Button, Tooltip} from "@heroui/react";
+import {Button} from "@heroui/react";
 import {useEffect, useState} from "react";
+import {useNavigate} from "react-router-dom";
 import {getAppInfo} from "../ts/app_info.ts";
 import * as dialog from "@tauri-apps/plugin-dialog";
 import * as fs from "@tauri-apps/plugin-fs";
 import {motion} from "framer-motion";
 import {Icon} from "@iconify-icon/react";
+import {useWizard} from "../state/WizardContext.tsx";
+import {loadSettings, pushRecentFolder} from "../ts/settings.ts";
 
-export default function Home()
+export default function DirectorySelectPage()
 {
+    const navigate = useNavigate();
+    const {setDirectory: commitDirectory} = useWizard();
     const [version, setVersion] = useState("");
     const [build, setBuild] = useState("");
     const [directory, setDirectory] = useState("");
     const [correctDirectory, setCorrectDirectory] = useState(false);
     const [error, setError] = useState("");
+    const [recent, setRecent] = useState<string[]>([]);
 
     useEffect(() =>
     {
@@ -22,12 +28,21 @@ export default function Home()
             setBuild(info.build);
             setVersion(info.version);
         });
+        loadSettings().then(s => setRecent(s.rememberRecent ? s.recentFolders : []));
     }, []);
+
+    const startScan = async () =>
+    {
+        commitDirectory(directory);
+        await pushRecentFolder(directory);
+        navigate("/scan");
+    };
 
     useEffect(() =>
     {
         setCorrectDirectory(false);
         setError("");
+        if (directory === "") return;
         fs.exists(directory).then(async exists =>
         {
             if (exists)
@@ -100,25 +115,29 @@ export default function Home()
                 >
                     {error}
                 </motion.p>
-                <motion.div
-                    className={"absolute overflow-hidden"}
-                    initial={{
-                        right: 0
-                    }}
-                    animate={{
-                        right: correctDirectory ? -50 : 0
-                    }}
+            </div>
 
-                >
-                    <Tooltip delay={200}>
-                        <Tooltip.Trigger>
-                            <Button className={"rounded-xl"} size={"lg"} isIconOnly variant={"tertiary"}><Icon icon={"lucide:arrow-right"}/></Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>
-                            Scan &amp; Continue
-                        </Tooltip.Content>
-                    </Tooltip>
-                </motion.div>
+            {recent.length > 0 && (
+                <div className={"mt-6 flex flex-col gap-1.5"}>
+                    <div className={"text-section-label"}>Recent folders</div>
+                    <div className={"flex flex-wrap gap-2"}>
+                        {recent.map(folder => (
+                            <button
+                                key={folder}
+                                type={"button"}
+                                onClick={() => setDirectory(folder)}
+                                className={"text-path bg-surface-2 border border-border rounded-lg px-3 py-1.5 hover:border-border-strong cursor-pointer max-w-80 truncate"}
+                            >
+                                {folder}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className={"mt-6 flex gap-6 text-[12.5px]"} style={{color: "var(--muted-foreground)"}}>
+                <button type={"button"} className={"cursor-pointer hover:text-surface-foreground"} onClick={() => navigate("/settings")}>Settings</button>
+                <a href={"https://github.com/drew-chase/sievemc"} target={"_blank"} rel={"noreferrer"} className={"cursor-pointer hover:text-surface-foreground"}>Docs</a>
             </div>
 
             <div className={"absolute bottom-4 left-30 text-path opacity-65"}>
@@ -130,11 +149,11 @@ export default function Home()
                     bottom: -50
                 }}
                 animate={{
-                    // bottom: correctDirectory ? 16 : -50
+                    bottom: correctDirectory ? 16 : -50
                 }}
 
             >
-                <Button>Continue <Icon icon={"lucide:arrow-right"}/></Button>
+                <Button onPress={startScan}>Scan &amp; Continue <Icon icon={"lucide:arrow-right"}/></Button>
             </motion.div>
         </div>
     );
