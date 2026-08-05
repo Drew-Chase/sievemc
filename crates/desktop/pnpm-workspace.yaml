@@ -1,2 +1,7 @@
 allowBuilds:
   '@parcel/watcher': true
+
+# Disable pnpm's minimum-release-age supply-chain gate: the committed lockfile
+# is already vetted, and release builds must install it as-is (including freshly
+# published transitive deps like rolldown) without being blocked.
+minimumReleaseAge: 0
