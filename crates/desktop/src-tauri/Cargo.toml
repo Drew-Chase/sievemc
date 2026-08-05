@@ -41,3 +41,7 @@ xz2 = "0.1.7"
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-store = "2"
+
+# Core sieving library (crate name `sievemc`), used by the scan/export commands.
+sievemc_lib = { path = "../../lib" }

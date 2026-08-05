@@ -1,8 +1,10 @@
 use tracing::{debug, error, info, trace, warn};
 
 mod app_info_commands;
+mod sieve_commands;
 mod util;
 use app_info_commands::get_versions;
+use sieve_commands::{export, open_path, scan};
 
 pub static DEBUG: bool = cfg!(debug_assertions);
 
@@ -43,7 +45,14 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![get_versions, log])
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![
+            get_versions,
+            log,
+            scan,
+            export,
+            open_path
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

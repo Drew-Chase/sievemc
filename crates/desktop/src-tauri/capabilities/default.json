@@ -14,8 +14,10 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-set-decorations",
     "opener:default",
+    "opener:allow-open-path",
     "dialog:allow-save",
     "dialog:allow-open",
+    "store:default",
     "fs:default",
     {
       "identifier": "fs:allow-exists",

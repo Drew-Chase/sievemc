@@ -13,7 +13,7 @@
     "windows": [
       {
         "title": "sievemc",
-        "minWidth": 800,
+        "minWidth": 880,
         "minHeight": 600,
         "height": 720,
         "width": 1280,
