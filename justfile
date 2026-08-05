@@ -6,7 +6,14 @@ desktop_version:=`uv --path ./crates/desktop --current`
 default:
     @just --list
 
+[windows]
 dist: dist-os dist-docker
+
+[linux]
+dist: dist-os
+
+[macos]
+dist: dist-os
 
 [windows]
 dist-os: build
@@ -65,8 +72,7 @@ desktop:install
 [working-directory: './crates/desktop']
 install:
     @cargo install update-version
-    @pnpm upgrade
-    @pnpm i
+    @pnpm install --frozen-lockfile
 
 [working-directory: './crates/desktop']
 _clean_pnpm:
