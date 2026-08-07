@@ -1,10 +1,14 @@
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Seek, SeekFrom, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, SystemTime};
 
 use chrono::{Local, Timelike};
+use serde::{Deserialize, Serialize};
 use tar::Builder;
+use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::{Layer, fmt, prelude::*};
@@ -201,9 +205,9 @@ fn logs_dir() -> io::Result<PathBuf> {
 fn has_existing_logs(dir: &Path) -> bool {
     LOG_FILES.iter().any(|name| {
         dir.join(name)
-            .metadata()
-            .map(|m| m.len() > 0)
-            .unwrap_or(false)
+           .metadata()
+           .map(|m| m.len() > 0)
+           .unwrap_or(false)
     })
 }
 
@@ -218,30 +222,174 @@ fn fresh_file(dir: &Path, name: &str) -> io::Result<File> {
 
 /// Snapshot the current log files into a timestamped LZMA2 "Ultra" tarball:
 /// `{YYYY-MM-DD}.{ms-past-midnight}.tar.xz`.
+///
+/// This must never block logging (or app startup) for long. The only work done
+/// on the calling thread is copying the current logs into a private
+/// `.tmp/{stamp}/` staging directory — cheap, and it lets the live files be
+/// truncated and reused immediately. The slow LZMA compression then runs off
+/// the hot path on a detached thread, so the application (and further logging)
+/// resumes at once.
+///
+/// The logs are *copied* rather than renamed on purpose: during a size roll the
+/// live files are still open and truncated in place by [`RollingLogs::roll`],
+/// so moving the handles out from under it would break on Windows (sharing
+/// violation) and silently detach the handle on Unix.
 fn archive(dir: &Path) -> io::Result<()> {
     let now = Local::now();
     let ms_past_midnight =
         now.num_seconds_from_midnight() as u64 * 1000 + now.timestamp_subsec_millis() as u64;
-    let file_name = format!("{}.{}.tar.xz", now.format("%Y-%m-%d"), ms_past_midnight);
+    let stamp = format!("{}.{}", now.format("%Y-%m-%d"), ms_past_midnight);
 
-    let output = File::create(dir.join(&file_name))?;
-    let stream = Stream::new_easy_encoder(9 | LZMA_PRESET_EXTREME, Check::Crc64)
-        .map_err(io::Error::other)?;
-    let mut builder = Builder::new(XzEncoder::new_stream(output, stream));
+    let staging = dir.join(".tmp").join(&stamp);
+    fs::create_dir_all(&staging)?;
 
+    let mut staged: Vec<&str> = Vec::new();
     for name in LOG_FILES {
-        match File::open(dir.join(name)) {
-            Ok(mut file) => {
-                let len = file.metadata()?.len();
-                if len > 0 {
-                    builder.append_file(name, &mut file)?;
-                }
+        let src = dir.join(name);
+        match fs::metadata(&src) {
+            Ok(meta) if meta.len() > 0 => {
+                fs::copy(&src, staging.join(name))?;
+                staged.push(name);
             }
+            Ok(_) => {}
             Err(e) if e.kind() == io::ErrorKind::NotFound => {}
             Err(e) => return Err(e),
         }
     }
 
-    builder.into_inner()?.finish()?;
+    // Nothing worth compressing — drop the empty staging dir and bail.
+    if staged.is_empty() {
+        let _ = fs::remove_dir(&staging);
+        return Ok(());
+    }
+
+    let archive_path = dir.join(format!("{stamp}.tar.xz"));
+    let dir = dir.to_path_buf();
+    let staged: Vec<String> = staged.into_iter().map(str::to_owned).collect();
+
+    thread::spawn(move || {
+        if let Err(e) = compress_staged(&archive_path, &staging, &staged) {
+            eprintln!("log archival failed: {e}");
+        }
+        let _ = fs::remove_dir_all(&staging);
+        if let Err(e) = cleanup_old_logs_archives(&dir) {
+            eprintln!("log archive cleanup failed: {e}");
+        }
+    });
+
     Ok(())
+}
+
+/// Compress the staged log copies in `staging` into `archive_path` as an LZMA2
+/// "Ultra" tarball. Runs on a background thread; see [`archive`].
+///
+/// Progress is written straight to stdout via [`println!`] as bytes are fed
+/// into the compressor, throttled to one line per whole-percent change.
+fn compress_staged(archive_path: &Path, staging: &Path, names: &[String]) -> io::Result<()> {
+    let label = archive_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("archive");
+
+    let total: u64 = names
+        .iter()
+        .map(|name| fs::metadata(staging.join(name)).map(|m| m.len()).unwrap_or(0))
+        .sum();
+
+    println!("log archive: compressing {label} ({total} bytes)");
+
+    let output = File::create(archive_path)?;
+    let stream = Stream::new_easy_encoder(9 | LZMA_PRESET_EXTREME, Check::Crc64)
+        .map_err(io::Error::other)?;
+    let mut builder = Builder::new(XzEncoder::new_stream(output, stream));
+
+    let mut processed = 0u64;
+    let mut last_percent = u8::MAX; // sentinel so the first read always prints
+    for name in names {
+        let file = File::open(staging.join(name))?;
+        let mut header = tar::Header::new_gnu();
+        header.set_metadata(&file.metadata()?);
+        let reader = ProgressReader {
+            inner: file,
+            processed: &mut processed,
+            total,
+            last_percent: &mut last_percent,
+            label,
+        };
+        builder.append_data(&mut header, name, reader)?;
+    }
+
+    builder.into_inner()?.finish()?;
+    println!("log archive: compressed {label} — done");
+    Ok(())
+}
+
+/// Wraps a log file being fed into the tarball, reporting cumulative
+/// compression progress to stdout as it is read.
+struct ProgressReader<'a> {
+    inner: File,
+    /// Bytes read so far across *all* staged files (shared across the set).
+    processed: &'a mut u64,
+    /// Total bytes to compress across all staged files.
+    total: u64,
+    /// Last whole-percent value printed, used to throttle output.
+    last_percent: &'a mut u8,
+    label: &'a str,
+}
+
+impl Read for ProgressReader<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        *self.processed += n as u64;
+
+        let percent = if self.total == 0 {
+            100
+        } else {
+            (*self.processed * 100 / self.total) as u8
+        };
+        if percent != *self.last_percent {
+            *self.last_percent = percent;
+            println!("log archive: compressing {} — {percent}%", self.label);
+        }
+        Ok(n)
+    }
+}
+
+fn cleanup_old_logs_archives(dir: &Path) -> io::Result<()> {
+    let logs_older_than_days = 14u8;
+    let cutoff = SystemTime::now()
+        .checked_sub(Duration::from_secs(logs_older_than_days as u64 * 24 * 3600))
+        .unwrap_or(SystemTime::UNIX_EPOCH);
+
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("xz") {
+            continue;
+        }
+        if let Ok(modified) = entry.metadata()?.modified()
+            && modified < cutoff
+        {
+            fs::remove_file(&path)?;
+        }
+    }
+
+    Ok(())
+}
+/// Bridge for webview-side logging.
+///
+/// The frontend logger (see `src/util/logger.ts`) invokes this command so that
+/// `console.*` / `log.*` calls in React are re-emitted as `tracing` events
+/// under the `frontend` target and land in the same rolling log files as the
+/// Rust-side logs.
+#[tauri::command]
+pub async fn log(level: String, message: String, location: Option<String>) {
+    match level.as_str() {
+        "trace" => trace!(target: "frontend", location = ?location, "{message}"),
+        "debug" => debug!(target: "frontend", location = ?location, "{message}"),
+        "info" => info!(target: "frontend", location = ?location, "{message}"),
+        "warn" => warn!(target: "frontend", location = ?location, "{message}"),
+        "error" => error!(target: "frontend", location = ?location, "{message}"),
+        _ => info!(target: "frontend", location = ?location, "{message}"),
+    }
 }
