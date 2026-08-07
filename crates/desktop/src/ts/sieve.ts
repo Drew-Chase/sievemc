@@ -19,6 +19,10 @@ export type ModDetection = {
     side: Side | null;
     evidence: string;
     loader: string | null;
+    /** Stable manifest id (fabric `id` / forge `modId`); used to remember overrides. */
+    mod_id: string | null;
+    /** Embedded mod icon as a base64 `data:` URI, or null when none was found. */
+    icon: string | null;
 };
 
 /** Live per-jar update streamed on `sieve://scan-progress`. */
