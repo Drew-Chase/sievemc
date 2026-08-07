@@ -35,7 +35,7 @@ _check_dirty:
 publish: _check_dirty _clean_dist dist
     @git tag -a v{{ desktop_version }} -m "v{{ desktop_version }}"
     @git push origin v{{ desktop_version }}
-    @gh release create v{{ desktop_version }} (Get-ChildItem target/dist | ForEach-Object FullName) --title "v{{ desktop_version }}" --notes ""
+    @gh release create v{{ desktop_version }} (Get-ChildItem target/dist | ForEach-Object FullName) --title "v{{ desktop_version }}" --notes "No changelog yet!"
 
 # Build a clean set of artifacts and publish them as a GitHub release
 [unix]
