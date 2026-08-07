@@ -165,6 +165,23 @@ pub struct ModDetection {
     pub evidence: String,
     /// Which loader manifest was found, if any: `fabric` / `forge` / `neoforge`.
     pub loader: Option<String>,
+    /// Stable mod identifier from the manifest (fabric `id` / forge `modId`), if any.
+    ///
+    /// Used by the desktop UI to remember per-mod side overrides across scans and
+    /// app restarts, independent of the (version-varying) jar filename.
+    pub mod_id: Option<String>,
+    /// The mod's embedded icon as a `data:` URI (base64), if one was found and
+    /// could be read from the jar. Directly usable as an `<img src>`.
+    pub icon: Option<String>,
+}
+
+/// Everything [`inspect_mod`] pulls out of a single jar's manifest.
+struct Inspection {
+    side: Option<Side>,
+    evidence: String,
+    loader: Option<String>,
+    mod_id: Option<String>,
+    icon: Option<String>,
 }
 
 fn side_label(side: &Side) -> &'static str {
@@ -186,7 +203,13 @@ pub fn detect_mod(path: impl AsRef<Path>) -> ModDetection {
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
-    let (side, evidence, loader) = inspect_mod(path);
+    let Inspection {
+        side,
+        evidence,
+        loader,
+        mod_id,
+        icon,
+    } = inspect_mod(path);
     debug!(
         "Detected {} for {}: {}",
         side.as_ref().map(side_label).unwrap_or("unsure"),
@@ -199,76 +222,162 @@ pub fn detect_mod(path: impl AsRef<Path>) -> ModDetection {
         side,
         evidence,
         loader,
+        mod_id,
+        icon,
     }
 }
 
-fn inspect_mod(path: &Path) -> (Option<Side>, String, Option<String>) {
+fn inspect_mod(path: &Path) -> Inspection {
+    let unsure = |evidence: String, loader: Option<String>| Inspection {
+        side: None,
+        evidence,
+        loader,
+        mod_id: None,
+        icon: None,
+    };
+
     let file = match File::open(path) {
         Ok(f) => f,
-        Err(e) => return (None, format!("could not open jar: {e}"), None),
+        Err(e) => return unsure(format!("could not open jar: {e}"), None),
     };
     let mut archive = match zip::ZipArchive::new(file) {
         Ok(a) => a,
-        Err(e) => return (None, format!("not a valid jar: {e}"), None),
+        Err(e) => return unsure(format!("not a valid jar: {e}"), None),
     };
 
-    if let Ok(entry) = archive.by_name("fabric.mod.json") {
-        let parsed = serde_json::from_reader(entry)
-            .map_err(SieveError::from)
-            .and_then(get_json_schema_side);
-        return match parsed {
-            Ok(side) => {
-                let evidence = format!("fabric.mod.json → {}", side_label(&side));
-                (Some(side), evidence, Some("fabric".to_string()))
-            }
-            Err(_) => (
-                None,
-                "fabric.mod.json → no side metadata found".to_string(),
-                Some("fabric".to_string()),
-            ),
+    // Fabric — read the manifest bytes first so the archive is free to be
+    // borrowed again below for the icon lookup.
+    if let Some(buf) = read_archive_entry(&mut archive, "fabric.mod.json") {
+        let value: Option<serde_json::Value> = serde_json::from_slice(&buf).ok();
+        let mod_id = value
+            .as_ref()
+            .and_then(|v| v.get("id"))
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
+        let icon = value
+            .as_ref()
+            .and_then(fabric_icon_path)
+            .and_then(|p| extract_icon(&mut archive, &p));
+
+        let side = value.and_then(|v| get_json_schema_side(v).ok());
+        let evidence = match &side {
+            Some(s) => format!("fabric.mod.json → {}", side_label(s)),
+            None => "fabric.mod.json → no side metadata found".to_string(),
+        };
+        return Inspection {
+            side,
+            evidence,
+            loader: Some("fabric".to_string()),
+            mod_id,
+            icon,
         };
     }
 
     if let Some(buf) = read_archive_entry(&mut archive, "META-INF/neoforge.mods.toml")
         .or_else(|| read_archive_entry(&mut archive, "neoforge.mods.toml"))
     {
-        return toml_detection(&buf, "neoforge", "neoforge.mods.toml");
+        return toml_detection(&mut archive, &buf, "neoforge", "neoforge.mods.toml");
     }
 
     if let Some(buf) = read_archive_entry(&mut archive, "META-INF/mods.toml")
         .or_else(|| read_archive_entry(&mut archive, "mods.toml"))
     {
-        return toml_detection(&buf, "forge", "mods.toml");
+        return toml_detection(&mut archive, &buf, "forge", "mods.toml");
     }
 
-    (None, "no side metadata found".to_string(), None)
+    unsure("no side metadata found".to_string(), None)
 }
 
-fn toml_detection(buf: &[u8], loader: &str, manifest: &str) -> (Option<Side>, String, Option<String>) {
+fn toml_detection(
+    archive: &mut zip::ZipArchive<File>,
+    buf: &[u8],
+    loader: &str,
+    manifest: &str,
+) -> Inspection {
+    let base = |side: Option<Side>, evidence: String, mod_id: Option<String>, icon: Option<String>| {
+        Inspection {
+            side,
+            evidence,
+            loader: Some(loader.to_string()),
+            mod_id,
+            icon,
+        }
+    };
+
     let text = match from_utf8(buf) {
         Ok(t) => t,
-        Err(_) => {
-            return (
-                None,
-                format!("{manifest} → not valid UTF-8"),
-                Some(loader.to_string()),
-            );
-        }
+        Err(_) => return base(None, format!("{manifest} → not valid UTF-8"), None, None),
     };
     let value: toml::Value = match toml::from_str(text) {
         Ok(v) => v,
-        Err(e) => return (None, format!("{manifest} → parse error: {e}"), Some(loader.to_string())),
+        Err(e) => return base(None, format!("{manifest} → parse error: {e}"), None, None),
     };
+
+    let mod_id = value
+        .get("mods")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|m| m.get("modId"))
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    let icon = value
+        .get("logoFile")
+        .and_then(|v| v.as_str())
+        .and_then(|p| extract_icon(archive, p));
+
     match get_loader_toml_side(value, loader) {
         Ok(side) => {
             let evidence = format!("{manifest} → {}", side_label(&side));
-            (Some(side), evidence, Some(loader.to_string()))
+            base(Some(side), evidence, mod_id, icon)
         }
-        Err(_) => (
+        Err(_) => base(
             None,
             format!("{manifest} → no side metadata found"),
-            Some(loader.to_string()),
+            mod_id,
+            icon,
         ),
+    }
+}
+
+/// Pick an icon path from a Fabric manifest's `icon` field, which may be either a
+/// bare string path or an object mapping resolution → path (largest wins).
+fn fabric_icon_path(schema: &serde_json::Value) -> Option<String> {
+    match schema.get("icon")? {
+        serde_json::Value::String(s) => Some(s.clone()),
+        serde_json::Value::Object(map) => map
+            .iter()
+            .max_by_key(|(k, _)| k.parse::<u32>().unwrap_or(0))
+            .and_then(|(_, v)| v.as_str().map(str::to_string)),
+        _ => None,
+    }
+}
+
+/// Read `entry` from the jar and return it as a base64 `data:` URI, or `None` if
+/// the entry is missing/unreadable. The MIME type is inferred from the extension.
+fn extract_icon(archive: &mut zip::ZipArchive<File>, entry: &str) -> Option<String> {
+    use base64::Engine as _;
+    let bytes = read_archive_entry(archive, entry)?;
+    if bytes.is_empty() {
+        return None;
+    }
+    let mime = icon_mime(entry);
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    trace!("Extracted {}-byte icon from {entry}", bytes.len());
+    Some(format!("data:{mime};base64,{encoded}"))
+}
+
+fn icon_mime(path: &str) -> &'static str {
+    let lower = path.to_ascii_lowercase();
+    if lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
+        "image/jpeg"
+    } else if lower.ends_with(".gif") {
+        "image/gif"
+    } else if lower.ends_with(".svg") {
+        "image/svg+xml"
+    } else if lower.ends_with(".webp") {
+        "image/webp"
+    } else {
+        "image/png"
     }
 }
 
@@ -561,6 +670,8 @@ mod detect_test {
         assert_eq!(d.loader.as_deref(), Some("fabric"));
         assert!(d.evidence.contains("fabric.mod.json"));
         assert_eq!(d.filename, "fabric_clientonly.jar");
+        // Manifest id is captured for remembering per-mod overrides across scans.
+        assert_eq!(d.mod_id.as_deref(), Some("clientside_mod_example"));
     }
 
     #[test]
