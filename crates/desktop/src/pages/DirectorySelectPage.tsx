@@ -140,7 +140,7 @@ export default function DirectorySelectPage()
                     className={"flex flex-row items-center bg-surface-2 border rounded-xl w-160 h-12 overflow-hidden relative z-10 transition-colors"}
                     style={{borderColor: dragOver ? "var(--accent)" : "var(--border)"}}
                 >
-                    <span className={"pl-4 text-path opacity-65"}>mods/</span>
+                    <span className={"pl-4 text-path"}>mods/</span>
                     <input
                         placeholder="drag a folder here, paste a path, or browse"
                         className={"w-full focus:outline-none px-2 font-mono text-[13px] text-surface-foreground h-full"}
@@ -215,7 +215,7 @@ export default function DirectorySelectPage()
                 <a href={"https://github.com/drew-chase/sievemc"} target={"_blank"} rel={"noreferrer"} className={"cursor-pointer hover:text-surface-foreground"}>Docs</a>
             </div>
 
-            <div className={"absolute bottom-4 left-30 text-path opacity-65"}>
+            <div className={"absolute bottom-4 left-30 text-path"}>
                 v{version} · build {build} · by Drew Chase
             </div>
             <motion.div
