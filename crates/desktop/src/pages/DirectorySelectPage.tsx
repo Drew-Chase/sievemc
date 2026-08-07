@@ -67,9 +67,9 @@ export default function DirectorySelectPage()
                         const idx = Math.max(dropped.lastIndexOf("\\"), dropped.lastIndexOf("/"));
                         if (idx > 0) setDirectory(dropped.slice(0, idx));
                     }
-                } catch
+                } catch (error)
                 {
-                    // Ignore unreadable drops; validation effect surfaces any error.
+                    console.error("Unable to handle drag and drop event:", error);
                 }
             }
         });
