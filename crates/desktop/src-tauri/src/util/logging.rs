@@ -6,7 +6,6 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use chrono::{Local, Timelike};
-use serde::{Deserialize, Serialize};
 use tar::Builder;
 use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::filter::LevelFilter;
@@ -205,9 +204,9 @@ fn logs_dir() -> io::Result<PathBuf> {
 fn has_existing_logs(dir: &Path) -> bool {
     LOG_FILES.iter().any(|name| {
         dir.join(name)
-           .metadata()
-           .map(|m| m.len() > 0)
-           .unwrap_or(false)
+            .metadata()
+            .map(|m| m.len() > 0)
+            .unwrap_or(false)
     })
 }
 
@@ -293,7 +292,11 @@ fn compress_staged(archive_path: &Path, staging: &Path, names: &[String]) -> io:
 
     let total: u64 = names
         .iter()
-        .map(|name| fs::metadata(staging.join(name)).map(|m| m.len()).unwrap_or(0))
+        .map(|name| {
+            fs::metadata(staging.join(name))
+                .map(|m| m.len())
+                .unwrap_or(0)
+        })
         .sum();
 
     println!("log archive: compressing {label} ({total} bytes)");

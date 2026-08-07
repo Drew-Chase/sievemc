@@ -1,4 +1,4 @@
-use tracing::{info, trace, warn};
+use tracing::info;
 
 mod app_info_commands;
 mod sieve_commands;
