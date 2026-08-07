@@ -1,6 +1,6 @@
 [package]
 name = "sievemc_desktop"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 rust-version = "1.90.0"
 description = "Desktop app for filtering Minecraft mod JARs by side (client, server, or both)"
