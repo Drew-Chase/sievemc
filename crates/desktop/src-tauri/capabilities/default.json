@@ -25,7 +25,15 @@
     "fs:default",
     {
       "identifier": "fs:allow-exists",
-      "allow": [{"path":  "*"}]
+      "allow": [{"path":  "**"}]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [{"path":  "**"}]
+    },
+    {
+      "identifier": "fs:allow-stat",
+      "allow": [{"path":  "**"}]
     },
     "fs:allow-app-meta"
   ]

@@ -119,8 +119,9 @@ export default function DirectorySelectPage()
             {
                 setError("Error: Directory doesn't contain any mod jar files");
             }
-        }).catch(() =>
+        }).catch(err =>
         {
+            console.error("Unable to validate directory:", directory, err);
             if (!ignore) setError("Error: Could not read directory");
         });
         return () =>
