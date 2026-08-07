@@ -113,7 +113,7 @@ export default function DonePage()
 
             {/* Terminal-style receipt */}
             <div className={"border-l border-border bg-surface-2 px-7 py-8 text-log overflow-y-auto"}>
-                <div className={"opacity-50"}># sievemc receipt · {today}</div>
+                <div className={"text-fg-faint"}># sievemc receipt · {today}</div>
                 {receipt.client.length > 0 && (
                     <>
                         <div style={{color: "var(--color-side-client)"}} className={"mt-1"}>
@@ -133,7 +133,7 @@ export default function DonePage()
                     </>
                 )}
                 {stats.decided > 0 && (
-                    <div className={"opacity-50 mt-2"}># {stats.decided} manual override{stats.decided === 1 ? "" : "s"} logged</div>
+                    <div className={"text-fg-faint mt-2"}># {stats.decided} manual override{stats.decided === 1 ? "" : "s"} logged</div>
                 )}
             </div>
         </motion.div>
