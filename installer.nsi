@@ -165,7 +165,7 @@ Section "Uninstall"
         Pop $0
     ${EndIf}
 
-    Delete "$INSTDIR\bin\sievemc.bat"
+    Delete "$INSTDIR\bin\sievemc.cmd"
     RMDir "$INSTDIR\bin"
     Delete "$INSTDIR\${APP_EXE}"
     Delete "$INSTDIR\${CLI_EXE}"
