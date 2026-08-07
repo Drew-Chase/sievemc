@@ -24,6 +24,9 @@ dist: dist-os
 [windows]
 dist-os: build
     @New-Item -Type Directory target/dist -Force
+    @Write-Host "Generating the installer"
+    @just installer
+    @Move-Item target/release/SieveMCSetup.exe target/dist/sievemc-setup.exe
     @Compress-Archive -Path target/release/sievemc.exe,target/release/sievemc_cli.exe -DestinationPath target/dist/sievemc-windows-x86_64-v{{ desktop_version }}.zip -Force
     @Write-Host "Zipping Desktop"
     @Compress-Archive -Path target/release/sievemc.exe -DestinationPath target/dist/sievemc-desktop-windows-x86_64-v{{ desktop_version }}.zip -Force
@@ -105,3 +108,13 @@ help:
 # Generate application icon from SVG source
 gen-icon:
     @cargo tauri icon .\crates\desktop\src-tauri\icons\sievemc-icon.svg
+
+[windows]
+installer: build
+    @if (Test-Path $(where.exe makensis)) {Write-Host "Found NSIS Compiler"}else{Write-Host "Missing NSIS Compiler"}
+    @just _update_nsis_version
+    @makensis ./installer.nsi
+[windows]
+_update_nsis_version:
+    @(Get-Content ./installer.nsi) -replace '!define APP_VERSION ".*"', '!define APP_VERSION "{{ desktop_version }}"' | Set-Content ./installer.nsi
+    @Write-Host "NSIS version set to {{ desktop_version }}"
