@@ -254,7 +254,7 @@ export default function ReviewPage()
                                             onChange={v => v === "auto" ? clearOverride(mod) : setOverride(mod, v)}
                                             renderTrigger={() => (
                                                 <span
-                                                    className={"flex items-center gap-1 font-medium text-[12px] rounded-md px-2 py-1 -mx-2 transition-colors hover:bg-white/10 hover:text-white!"}
+                                                    className={"flex items-center gap-1 font-medium text-[12px] rounded-md px-2 py-1 -mx-2 transition-colors hover:bg-surface-3 hover:text-surface-foreground!"}
                                                     style={{color: override ? sideColorVar(override) : isUnsure ? "var(--color-side-unsure)" : "var(--muted-foreground)"}}
                                                 >
                                                     {override ? OVERRIDE_OPTIONS.find(o => o.value === override)?.label : isUnsure ? "Pick" : "Auto"}
