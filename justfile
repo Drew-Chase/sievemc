@@ -8,6 +8,42 @@ desktop_version := `uv --path ./crates/desktop --current`
 default:
     @just --list
 
+# Remove previously generated distribution artifacts
+[windows]
+_clean_dist:
+    @Remove-Item target/dist -Recurse -Force -ErrorAction SilentlyContinue
+    @New-Item -Type Directory target/dist -Force | Out-Null
+
+# Remove previously generated distribution artifacts
+[unix]
+_clean_dist:
+    @rm -rf target/dist
+    @mkdir -p target/dist
+
+# Fail if the working tree has uncommitted changes
+[windows]
+_check_dirty:
+    @if ((git status --porcelain) -ne $null) { git status --short; Write-Host "Working tree is dirty - commit or stash your changes before publishing." -ForegroundColor Red; exit 1 }
+
+# Fail if the working tree has uncommitted changes
+[unix]
+_check_dirty:
+    @if [ -n "$(git status --porcelain)" ]; then git status --short; echo "Working tree is dirty - commit or stash your changes before publishing." >&2; exit 1; fi
+
+# Build a clean set of artifacts and publish them as a GitHub release
+[windows]
+publish: _check_dirty _clean_dist dist
+    @git tag -a v{{ desktop_version }} -m "v{{ desktop_version }}"
+    @git push origin v{{ desktop_version }}
+    @gh release create v{{ desktop_version }} (Get-ChildItem target/dist | ForEach-Object FullName) --title "v{{ desktop_version }}" --notes ""
+
+# Build a clean set of artifacts and publish them as a GitHub release
+[unix]
+publish: _check_dirty _clean_dist dist
+    @git tag -a v{{ desktop_version }} -m "v{{ desktop_version }}"
+    @git push origin v{{ desktop_version }}
+    @gh release create v{{ desktop_version }} target/dist/* --title "v{{ desktop_version }}" --notes ""
+
 # Build distribution packages for Windows (OS and Docker)
 [windows]
 dist: dist-os dist-docker
