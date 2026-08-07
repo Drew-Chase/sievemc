@@ -3,7 +3,7 @@ import {useNavigate} from "react-router-dom";
 import {motion} from "framer-motion";
 import {Button, toast} from "@heroui/react";
 import {Icon} from "@iconify-icon/react";
-import {useWizard} from "../state/WizardContext.tsx";
+import {overrideKey, useWizard} from "../state/WizardContext.tsx";
 import {openPath} from "../ts/sieve.ts";
 import {SideDot} from "../components/SideBadge.tsx";
 
@@ -34,7 +34,7 @@ export default function DonePage()
         let clientOnly = 0, serverOnly = 0, both = 0;
         for (const mod of mods)
         {
-            const side = overrides[mod.path] ?? mod.side;
+            const side = overrides[overrideKey(mod)] ?? mod.side;
             if (side === "client-only") clientOnly++;
             else if (side === "server-only") serverOnly++;
             else if (side === "client-and-server") both++;
