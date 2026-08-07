@@ -1,7 +1,7 @@
-import {useEffect, useMemo} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {useNavigate} from "react-router-dom";
 import {motion} from "framer-motion";
-import {Button} from "@heroui/react";
+import {Button, toast} from "@heroui/react";
 import {Icon} from "@iconify-icon/react";
 import {useWizard} from "../state/WizardContext.tsx";
 import {openPath} from "../ts/sieve.ts";
@@ -51,6 +51,38 @@ export default function DonePage()
         reset();
         navigate("/", {replace: true});
     };
+
+    // Text-only export: no files were written, so present copyable newline-
+    // delimited lists of client and server mods instead of the sidebar receipt.
+    if (state.exportConfig.outputType === "list")
+    {
+        return (
+            <motion.div
+                className={"flex flex-col w-full h-full overflow-hidden px-14 py-10"}
+                initial={{opacity: 0}}
+                animate={{opacity: 1}}
+            >
+                <div className={"text-accent font-mono text-[13px]"}>done in {(receipt.duration_ms / 1000).toFixed(1)}s</div>
+                <h1 className={"text-[34px] font-bold leading-tight tracking-tight mt-2 mb-1"}>
+                    {mods.length} mods, sorted.
+                </h1>
+                <p className={"text-description mb-6"}>Copy the lists below — nothing was written to disk.</p>
+
+                <div className={"flex-1 grid grid-cols-2 gap-5 min-h-0"}>
+                    {receipt.client.length > 0 && (
+                        <CopyList title={"client-mods"} color={"var(--color-side-client)"} items={receipt.client}/>
+                    )}
+                    {receipt.server.length > 0 && (
+                        <CopyList title={"server-mods"} color={"var(--color-side-server)"} items={receipt.server}/>
+                    )}
+                </div>
+
+                <div className={"flex gap-3 mt-6"}>
+                    <Button variant={"tertiary"} onPress={sieveAnother}>Sieve another</Button>
+                </div>
+            </motion.div>
+        );
+    }
 
     return (
         <motion.div
@@ -105,6 +137,43 @@ export default function DonePage()
                 )}
             </div>
         </motion.div>
+    );
+}
+
+function CopyList({title, color, items}: {title: string; color: string; items: string[]})
+{
+    const [copied, setCopied] = useState(false);
+    const text = items.join("\n");
+
+    const copy = async () =>
+    {
+        try
+        {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch
+        {
+            toast.danger("Couldn't copy to clipboard");
+        }
+    };
+
+    return (
+        <div className={"flex flex-col min-h-0"}>
+            <div className={"flex items-center justify-between mb-2"}>
+                <span className={"text-section-label"} style={{color}}>{title} ({items.length})</span>
+                <Button variant={"tertiary"} onPress={copy}>
+                    <Icon icon={copied ? "lucide:check" : "lucide:copy"}/> {copied ? "Copied" : "Copy"}
+                </Button>
+            </div>
+            <textarea
+                readOnly
+                value={text}
+                onFocus={e => e.currentTarget.select()}
+                className={"flex-1 min-h-0 resize-none bg-surface-2 border border-border rounded-lg p-3.5 font-mono text-[12.5px] text-surface-foreground focus:outline-none focus:border-border-strong"}
+                spellCheck={false}
+            />
+        </div>
     );
 }
 
