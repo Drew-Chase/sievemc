@@ -2,9 +2,11 @@ use tracing::{info, trace, warn};
 
 mod app_info_commands;
 mod sieve_commands;
+mod updater;
 mod util;
 use app_info_commands::get_versions;
 use sieve_commands::{export, open_path, scan};
+use updater::{check_for_update, download_update, install_update};
 use util::logging::log;
 
 pub static DEBUG: bool = cfg!(debug_assertions);
@@ -58,7 +60,10 @@ pub fn run() {
             log,
             scan,
             export,
-            open_path
+            open_path,
+            check_for_update,
+            download_update,
+            install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
