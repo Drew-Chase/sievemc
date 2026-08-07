@@ -5,7 +5,7 @@
 
 ; Constants
 !define APP_NAME "SieveMC"
-!define APP_VERSION "0.2.1"
+!define APP_VERSION "1.0.0"
 !define APP_PUBLISHER "LFInteractive LLC."
 !define APP_EXE "sievemc.exe"
 !define CLI_EXE "sievemc_cli.exe"
