@@ -11,11 +11,13 @@ import ExportPage from "./pages/ExportPage.tsx";
 import ExportProgressPage from "./pages/ExportProgressPage.tsx";
 import DonePage from "./pages/DonePage.tsx";
 import SettingsPage from "./pages/SettingsPage.tsx";
+import ChangelogPage from "./pages/ChangelogPage.tsx";
 import {Toast} from "@heroui/react";
 import {attachConsoleToTracing} from "./util/logger.ts";
 import {WindowChrome} from "./components/WindowChrome.tsx";
 import {ErrorBoundary} from "./ErrorBoundry.tsx";
 import {WizardProvider} from "./state/WizardContext.tsx";
+import {UpdaterProvider} from "./state/UpdaterContext.tsx";
 
 // Route all console output and uncaught errors through the Rust tracing
 // pipeline so frontend logs land in the same rolling log files as native logs.
@@ -25,7 +27,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
         <BrowserRouter>
             <WizardProvider>
-                <MainContentRenderer/>
+                <UpdaterProvider>
+                    <MainContentRenderer/>
+                </UpdaterProvider>
             </WizardProvider>
         </BrowserRouter>
     </React.StrictMode>
@@ -63,6 +67,7 @@ function AnimatedRoutes()
                 <Route path="/exporting" element={<ExportProgressPage/>}/>
                 <Route path="/done" element={<DonePage/>}/>
                 <Route path="/settings" element={<SettingsPage/>}/>
+                <Route path="/changelog" element={<ChangelogPage/>}/>
             </Routes>
         </AnimatePresence>
     );
