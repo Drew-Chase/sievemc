@@ -18,6 +18,10 @@
     "dialog:allow-save",
     "dialog:allow-open",
     "store:default",
+    "sql:allow-load",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "sql:allow-close",
     "fs:default",
     {
       "identifier": "fs:allow-exists",

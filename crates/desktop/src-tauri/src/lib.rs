@@ -26,6 +26,25 @@ fn log(level: String, message: String, location: Option<String>) {
     }
 }
 
+/// SQLite schema for the persisted per-mod side overrides.
+///
+/// Keyed by the mod's stable manifest id so a user's choice ("this is a
+/// client-only mod") is remembered across scans, versions, and app restarts,
+/// independent of the (version-varying) jar filename.
+fn override_migrations() -> Vec<tauri_plugin_sql::Migration> {
+    use tauri_plugin_sql::{Migration, MigrationKind};
+    vec![Migration {
+        version: 1,
+        description: "create overrides table",
+        sql: "CREATE TABLE IF NOT EXISTS overrides (\
+                mod_id TEXT PRIMARY KEY, \
+                side TEXT NOT NULL, \
+                updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))\
+              );",
+        kind: MigrationKind::Up,
+    }]
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     if let Err(e) = util::logging::setup_logging() {
@@ -46,6 +65,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(
+            tauri_plugin_sql::Builder::default()
+                .add_migrations("sqlite:sieve.db", override_migrations())
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             get_versions,
             log,
