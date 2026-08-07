@@ -4,10 +4,11 @@ import {useNavigate} from "react-router-dom";
 import {getAppInfo} from "../ts/app_info.ts";
 import * as dialog from "@tauri-apps/plugin-dialog";
 import * as fs from "@tauri-apps/plugin-fs";
+import {getCurrentWebview} from "@tauri-apps/api/webview";
 import {motion} from "framer-motion";
 import {Icon} from "@iconify-icon/react";
 import {useWizard} from "../state/WizardContext.tsx";
-import {loadSettings, pushRecentFolder} from "../ts/settings.ts";
+import {loadSettings, pushRecentFolder, removeRecentFolder} from "../ts/settings.ts";
 
 export default function DirectorySelectPage()
 {
@@ -19,6 +20,7 @@ export default function DirectorySelectPage()
     const [correctDirectory, setCorrectDirectory] = useState(false);
     const [error, setError] = useState("");
     const [recent, setRecent] = useState<string[]>([]);
+    const [dragOver, setDragOver] = useState(false);
 
     useEffect(() =>
     {
@@ -30,6 +32,59 @@ export default function DirectorySelectPage()
         });
         loadSettings().then(s => setRecent(s.rememberRecent ? s.recentFolders : []));
     }, []);
+
+    // Accept a folder dropped anywhere on this window. The dropped path may be a
+    // directory (use it directly) or a file (fall back to its parent folder).
+    useEffect(() =>
+    {
+        let ignore = false;
+        const unlistenPromise = getCurrentWebview().onDragDropEvent(async event =>
+        {
+            if (ignore) return;
+            if (event.payload.type === "over" || event.payload.type === "enter")
+            {
+                setDragOver(true);
+                return;
+            }
+            if (event.payload.type === "leave")
+            {
+                setDragOver(false);
+                return;
+            }
+            if (event.payload.type === "drop")
+            {
+                setDragOver(false);
+                const dropped = event.payload.paths[0];
+                if (!dropped) return;
+                try
+                {
+                    const isDir = (await fs.stat(dropped)).isDirectory;
+                    if (isDir)
+                    {
+                        setDirectory(dropped);
+                    } else
+                    {
+                        const idx = Math.max(dropped.lastIndexOf("\\"), dropped.lastIndexOf("/"));
+                        if (idx > 0) setDirectory(dropped.slice(0, idx));
+                    }
+                } catch
+                {
+                    // Ignore unreadable drops; validation effect surfaces any error.
+                }
+            }
+        });
+        return () =>
+        {
+            ignore = true;
+            unlistenPromise.then(unlisten => unlisten());
+        };
+    }, []);
+
+    const removeRecent = async (folder: string) =>
+    {
+        await removeRecentFolder(folder);
+        setRecent(prev => prev.filter(f => f !== folder));
+    };
 
     const startScan = async () =>
     {
@@ -43,30 +98,35 @@ export default function DirectorySelectPage()
         setCorrectDirectory(false);
         setError("");
         if (directory === "") return;
+        // Guard against a stale async resolution clobbering the state for a newer
+        // directory value (or after unmount). Without this, re-entering a folder
+        // could leave the Continue button hidden even for a valid directory.
+        let ignore = false;
         fs.exists(directory).then(async exists =>
         {
-            if (exists)
+            if (!exists)
             {
-                const entries = await fs.readDir(directory);
-                let hasJar = false;
-                for (const entry of entries)
-                {
-                    if (entry.isFile && entry.name.endsWith(".jar"))
-                    {
-                        setCorrectDirectory(true);
-                        hasJar = true;
-                        break;
-                    }
-                }
-                if (!hasJar)
-                {
-                    setError("Error: Directory doesn't contain any mod jar files");
-                }
+                if (!ignore) setError("Error: Could not read directory");
+                return;
+            }
+            const entries = await fs.readDir(directory);
+            if (ignore) return;
+            const hasJar = entries.some(entry => entry.isFile && entry.name.endsWith(".jar"));
+            if (hasJar)
+            {
+                setCorrectDirectory(true);
             } else
             {
-                setError("Error: Could not read directory");
+                setError("Error: Directory doesn't contain any mod jar files");
             }
+        }).catch(() =>
+        {
+            if (!ignore) setError("Error: Could not read directory");
         });
+        return () =>
+        {
+            ignore = true;
+        };
     }, [directory]);
 
     return (
@@ -76,7 +136,10 @@ export default function DirectorySelectPage()
             <h1 className="text-hero">Stop hand-sorting your mods folder.</h1>
             <p className={"text-description mt-4 mb-10 max-w-130"}>SieveMC reads every jar and tells you which mods are client-only, server-only, or needed on both sides — then exports clean sets for your modpack and your server.</p>
             <div className={"flex flex-row items-center bg-surface-2 border border-border rounded-xl w-160 h-12 relative"}>
-                <div className={"flex flex-row items-center bg-surface-2 border border-border rounded-xl w-160 h-12 overflow-hidden relative z-10"}>
+                <div
+                    className={"flex flex-row items-center bg-surface-2 border rounded-xl w-160 h-12 overflow-hidden relative z-10 transition-colors"}
+                    style={{borderColor: dragOver ? "var(--accent)" : "var(--border)"}}
+                >
                     <span className={"pl-4 text-path opacity-65"}>mods/</span>
                     <input
                         placeholder="drag a folder here, paste a path, or browse"
@@ -122,14 +185,26 @@ export default function DirectorySelectPage()
                     <div className={"text-section-label"}>Recent folders</div>
                     <div className={"flex flex-wrap gap-2"}>
                         {recent.map(folder => (
-                            <button
+                            <div
                                 key={folder}
-                                type={"button"}
-                                onClick={() => setDirectory(folder)}
-                                className={"text-path bg-surface-2 border border-border rounded-lg px-3 py-1.5 hover:border-border-strong cursor-pointer max-w-80 truncate"}
+                                className={"group flex items-center gap-1.5 text-path bg-surface-2 border border-border rounded-lg pl-3 pr-1.5 py-1.5 hover:border-border-strong"}
                             >
-                                {folder}
-                            </button>
+                                <button
+                                    type={"button"}
+                                    onClick={() => setDirectory(folder)}
+                                    className={"cursor-pointer max-w-80 truncate"}
+                                >
+                                    {folder}
+                                </button>
+                                <button
+                                    type={"button"}
+                                    aria-label={`Remove ${folder} from recent folders`}
+                                    onClick={() => removeRecent(folder)}
+                                    className={"grid place-items-center w-5 h-5 rounded text-muted-foreground hover:text-surface-foreground hover:bg-surface cursor-pointer shrink-0"}
+                                >
+                                    <Icon icon={"lucide:x"}/>
+                                </button>
+                            </div>
                         ))}
                     </div>
                 </div>

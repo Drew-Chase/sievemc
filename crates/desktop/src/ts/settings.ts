@@ -73,3 +73,11 @@ export async function pushRecentFolder(folder: string): Promise<void>
     const recentFolders = [folder, ...settings.recentFolders.filter(f => f !== folder)].slice(0, MAX_RECENT);
     await saveSettings({...settings, recentFolders});
 }
+
+/** Remove a single folder from the recent list. */
+export async function removeRecentFolder(folder: string): Promise<void>
+{
+    const settings = await loadSettings();
+    const recentFolders = settings.recentFolders.filter(f => f !== folder);
+    await saveSettings({...settings, recentFolders});
+}
