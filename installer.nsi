@@ -100,7 +100,6 @@ Section "Core Application" SecCore
 
     WriteUninstaller "$INSTDIR\uninstall.exe"
     WriteRegStr HKCU "Software\${APP_NAME}" "InstallPath" "$INSTDIR"
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${APP_NAME}" "$\"$INSTDIR\${APP_EXE}$\""
 
     ; Add/Remove Programs entry
     WriteRegStr HKCU "${UNINST_KEY}" "DisplayName" "${APP_NAME}"
@@ -118,8 +117,7 @@ Section "Core Application" SecCore
 
     ; Start menu shortcuts
     CreateDirectory "$SMPROGRAMS\${APP_PUBLISHER}\${APP_NAME}"
-    CreateShortcut "$SMPROGRAMS\${APP_PUBLISHER}\${APP_NAME}\${APP_NAME} Server.lnk" "$INSTDIR\${APP_EXE}"
-    CreateShortcut "$SMPROGRAMS\${APP_PUBLISHER}\${APP_NAME}\${APP_NAME} Configuration.lnk" "$INSTDIR\${CLI_EXE}"
+    CreateShortcut "$SMPROGRAMS\${APP_PUBLISHER}\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}"
     CreateShortcut "$SMPROGRAMS\${APP_PUBLISHER}\${APP_NAME}\Uninstall ${APP_NAME}.lnk" "$INSTDIR\uninstall.exe"
 
     ; CLI launcher: a bin\ dir next to the binaries that gets added to PATH.
@@ -175,10 +173,8 @@ Section "Uninstall"
 
     DeleteRegKey HKCU "Software\${APP_NAME}"
     DeleteRegKey HKCU "${UNINST_KEY}"
-    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${APP_NAME}"
 
-    Delete "$SMPROGRAMS\${APP_PUBLISHER}\${APP_NAME}\${APP_NAME} Server.lnk"
-    Delete "$SMPROGRAMS\${APP_PUBLISHER}\${APP_NAME}\${APP_NAME} Configuration.lnk"
+    Delete "$SMPROGRAMS\${APP_PUBLISHER}\${APP_NAME}\${APP_NAME}.lnk"
     Delete "$SMPROGRAMS\${APP_PUBLISHER}\${APP_NAME}\Uninstall ${APP_NAME}.lnk"
     RMDir "$SMPROGRAMS\${APP_PUBLISHER}\${APP_NAME}"
     RMDir "$SMPROGRAMS\${APP_PUBLISHER}"
