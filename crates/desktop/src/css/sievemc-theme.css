@@ -9,13 +9,6 @@
     --font-sans: 'Space Grotesk', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
 
-    /* Brand palette (exposed as Tailwind colors: bg-brand, text-side-client, etc.) */
-    --color-brand: #43e05c;          /* primary green — server side, CTAs */
-    --color-brand-dim: #2ea344;      /* pressed / hover-darker */
-    --color-side-client: #43cfe0;    /* cyan — client-only */
-    --color-side-server: #43e05c;    /* green — server-only */
-    --color-side-both: #a9b3ac;      /* neutral — both sides */
-    --color-side-unsure: #e0b843;    /* amber — undetected, needs review */
 }
 
 /* Theme-switchable colors: register the utility names here so Tailwind
@@ -33,6 +26,20 @@
 
     --color-border: var(--border);
     --color-border-strong: var(--border-strong);
+
+    /* Brand + side palette. Theme-switchable: the light theme needs darker,
+       higher-contrast variants of the same hues to stay legible on white. */
+    --color-brand: var(--brand);
+    --color-brand-dim: var(--brand-dim);
+    --color-side-client: var(--side-client);
+    --color-side-server: var(--side-server);
+    --color-side-both: var(--side-both);
+    --color-side-unsure: var(--side-unsure);
+
+    /* De-emphasized text ramp (see --fg-* below) */
+    --color-fg-muted: var(--fg-muted);
+    --color-fg-subtle: var(--fg-subtle);
+    --color-fg-faint: var(--fg-faint);
 }
 
 /* HeroUI v3 tokens (un-layered :root declarations win over HeroUI's layered defaults).
@@ -42,6 +49,13 @@
 [data-theme="dark"] {
     --accent: #43e05c;
     --accent-foreground: #07130a; /* near-black on green */
+
+    --brand: #43e05c;          /* primary green — server side, CTAs */
+    --brand-dim: #2ea344;      /* pressed / hover-darker */
+    --side-client: #43cfe0;    /* cyan — client-only */
+    --side-server: #43e05c;    /* green — server-only */
+    --side-both: #a9b3ac;      /* neutral — both sides */
+    --side-unsure: #e0b843;    /* amber — undetected, needs review */
 
     --background: #0b0d0c; /* window background */
     --foreground: #e9efe9; /* primary text */
@@ -53,7 +67,13 @@
     --surface-3: #161b18; /* hover / selected tiles */
 
     --muted: #1c2420; /* icon placeholder blocks */
-    --muted-foreground: rgba(233, 239, 234, 0.5);
+    --muted-foreground: rgba(233, 239, 234, 0.72);
+
+    /* De-emphasis ramp — muted (descriptions) > subtle (captions, paths,
+       evidence, logs) > faint (section labels, version stamp). */
+    --fg-muted: rgba(233, 239, 234, 0.72);
+    --fg-subtle: rgba(233, 239, 234, 0.6);
+    --fg-faint: rgba(233, 239, 234, 0.48);
 
     --border: rgba(255, 255, 255, 0.08);
     --border-strong: rgba(255, 255, 255, 0.16);
@@ -73,39 +93,52 @@
 
 /* Light theme (secondary — the app ships dark by default) */
 [data-theme="light"]:not(.dark) {
-    --accent: #1a8f36; /* darker green for contrast on light */
+    --accent: #14762c; /* darker green — 5.4:1 on white */
     --accent-foreground: #ffffff;
 
-    --background: #edefec;
+    --brand: #14762c;
+    --brand-dim: #0f5a21;
+    --side-client: #0e6f80; /* deep cyan — legible on light surfaces */
+    --side-server: #14762c;
+    --side-both: #55605a;
+    --side-unsure: #8a6408; /* deep amber */
+
+    --background: #e4e7e2; /* darker than surfaces so cards read as raised */
     --foreground: #141815;
 
     --surface: #ffffff;
     --surface-foreground: #141815;
-    --surface-2: #f4f6f3;
-    --surface-3: #e6eae5;
+    --surface-2: #f2f4f0;
+    --surface-3: #dfe4dd;
 
-    --muted: #dde2dd;
-    --muted-foreground: rgba(20, 24, 21, 0.55);
+    --muted: #d3d9d2;
+    --muted-foreground: #4a534c;
 
-    --border: rgba(0, 0, 0, 0.1);
-    --border-strong: rgba(0, 0, 0, 0.22);
+    /* Solid greys rather than alpha: on light backgrounds low-alpha text
+       washes out well below the 4.5:1 minimum. */
+    --fg-muted: #4a534c;  /* 7.2:1 on white */
+    --fg-subtle: #59635c; /* 5.6:1 */
+    --fg-faint: #67716a;  /* 4.6:1 */
 
-    --success: #1a8f36;
+    --border: rgba(0, 0, 0, 0.16);
+    --border-strong: rgba(0, 0, 0, 0.34);
+
+    --success: #14762c;
     --success-foreground: #ffffff;
-    --warning: #a37b12;
+    --warning: #8a6408;
     --warning-foreground: #ffffff;
-    --danger: #c23838;
+    --danger: #b62b2b;
     --danger-foreground: #ffffff;
-    --info: #0e7490;
+    --info: #0e6f80;
     --info-foreground: #ffffff;
 
-    --focus: #1a8f36;
+    --focus: #14762c;
 }
 
 :root {
     --scrollbar-background-color: transparent;
-    --scrollbar-thumb-color: rgba(67, 224, 92, 0.55);
-    --scrollbar-thumb-hover-color: #43e05c;
+    --scrollbar-thumb-color: color-mix(in srgb, var(--brand) 55%, transparent);
+    --scrollbar-thumb-hover-color: var(--brand);
     overflow: auto;
     scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-background-color);
     scrollbar-width: thin;
@@ -145,7 +178,7 @@ code, kbd, samp, pre {
 }
 
 ::placeholder {
-    color: color-mix(in srgb, var(--foreground) 40%, transparent);
+    color: var(--fg-subtle);
     font-weight: 400;
 }
 
@@ -163,7 +196,7 @@ code, kbd, samp, pre {
     font-weight: 600;
     letter-spacing: 1.2px;
     text-transform: uppercase;
-    color: color-mix(in srgb, var(--foreground) 70%, transparent);
+    color: var(--fg-muted);
 }
 
 /* Big start-screen headline */
@@ -192,7 +225,7 @@ code, kbd, samp, pre {
     font-weight: 600;
     letter-spacing: 1px;
     text-transform: uppercase;
-    color: color-mix(in srgb, var(--foreground) 40%, transparent);
+    color: var(--fg-subtle);
 }
 
 /* Card / row / mod name */
@@ -218,7 +251,7 @@ code, kbd, samp, pre {
     font-size: 12.5px;
     font-weight: 400;
     line-height: 1.5;
-    color: color-mix(in srgb, var(--foreground) 50%, transparent);
+    color: var(--fg-muted);
 }
 
 /* Small tertiary text: counts, timestamps, "sieved 2d ago" */
@@ -226,7 +259,7 @@ code, kbd, samp, pre {
     font-family: var(--font-sans), sans-serif;
     font-size: 11.5px;
     font-weight: 400;
-    color: color-mix(in srgb, var(--foreground) 45%, transparent);
+    color: var(--fg-subtle);
 }
 
 /* File paths, jar filenames, versions */
@@ -234,7 +267,7 @@ code, kbd, samp, pre {
     font-family: var(--font-mono), monospace;
     font-size: 11.5px;
     font-weight: 400;
-    color: color-mix(in srgb, var(--foreground) 40%, transparent);
+    color: var(--fg-subtle);
 }
 
 /* Detection evidence: "fabric.mod.json → client" */
@@ -242,7 +275,7 @@ code, kbd, samp, pre {
     font-family: var(--font-mono), monospace;
     font-size: 11px;
     font-weight: 400;
-    color: color-mix(in srgb, var(--foreground) 40%, transparent);
+    color: var(--fg-subtle);
 }
 
 /* Scan/export log lines */
@@ -251,7 +284,7 @@ code, kbd, samp, pre {
     font-size: 11.5px;
     font-weight: 400;
     line-height: 1.9;
-    color: color-mix(in srgb, var(--foreground) 45%, transparent);
+    color: var(--fg-subtle);
 }
 
 /* Side badge label: CLIENT / SERVER / BOTH / UNSURE (pair with a side color) */
@@ -291,5 +324,5 @@ code, kbd, samp, pre {
     font-family: var(--font-mono), monospace;
     font-size: 11px;
     font-weight: 400;
-    color: color-mix(in srgb, var(--foreground) 30%, transparent);
+    color: var(--fg-faint);
 }
