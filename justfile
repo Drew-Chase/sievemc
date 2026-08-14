@@ -125,7 +125,6 @@ desktop: install
 # Install dependencies for the desktop application
 [working-directory('./crates/desktop')]
 install:
-    @cargo install update-version
     @pnpm install --frozen-lockfile
 
 # Clean pnpm artifacts
