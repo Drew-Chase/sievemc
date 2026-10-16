@@ -41,6 +41,7 @@ enum Side {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     tracing_subscriber::fmt::fmt()
+        .with_writer(std::io::stderr)
         .with_max_level(tracing::Level::TRACE)
         .init();
     let args = Arguments::parse();
