@@ -97,9 +97,16 @@ pub fn get_many_mod_file_sides(
                     SieveError::FileMissingSchemaProperty(file.clone(), property)
                 }
                 _ => e,
-            })?;
-            debug!("Detected side {:?} for {}", side, file.display());
-            sides.insert(file, side);
+            });
+            match side {
+                Ok(side) => {
+                    debug!("Detected side {:?} for {}", side, file.display());
+                    sides.insert(file, side);
+                }
+                Err(e) => {
+                    warn!("Skipping {}: {}", file.display(), e);
+                }
+            }
         }
         sides
     };
