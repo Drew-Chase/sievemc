@@ -97,9 +97,16 @@ pub fn get_many_mod_file_sides(
                     SieveError::FileMissingSchemaProperty(file.clone(), property)
                 }
                 _ => e,
-            })?;
-            debug!("Detected side {:?} for {}", side, file.display());
-            sides.insert(file, side);
+            });
+            match side {
+                Ok(side) => {
+                    debug!("Detected side {:?} for {}", side, file.display());
+                    sides.insert(file, side);
+                }
+                Err(e) => {
+                    warn!("Skipping {}: {}", file.display(), e);
+                }
+            }
         }
         sides
     };
@@ -569,32 +576,53 @@ fn get_loader_toml_side(contents: toml::Value, loader: &str) -> Result<Side, Sie
 
     trace!("Resolving side for mod_id={mod_id} loader={loader}");
 
-    let side_str = contents
+    if contents
+        .get("clientSideOnly")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        return Ok(Side::ClientOnly);
+    }
+
+    let deps = contents
         .get("dependencies")
         .and_then(|v| v.get(mod_id))
         .and_then(|v| v.as_array())
-        .and_then(|arr| {
-            arr.iter()
-                .find(|dep| dep.get("modId").and_then(|v| v.as_str()) == Some(loader))
-        })
-        .and_then(|dep| dep.get("side"))
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| {
-            SieveError::MissingSchemaProperty(format!("dependencies.{mod_id}[{loader}].side"))
+        .ok_or_else(|| SieveError::MissingSchemaProperty(format!("dependencies.{mod_id}")))?;
+    let mut has_client_dep = false;
+    let mut has_server_dep = false;
+
+    for dep in deps {
+        let dep_id = dep.get("modId").and_then(|v| v.as_str()).ok_or_else(|| {
+            SieveError::MissingSchemaProperty(format!("dependencies.{mod_id}[*].modId"))
         })?;
-
-    debug!("Side string for {mod_id}: \"{side_str}\"");
-
-    match side_str.to_uppercase().as_str() {
-        "BOTH" => Ok(Side::ClientAndServer),
-        "CLIENT" => Ok(Side::ClientOnly),
-        "SERVER" => Ok(Side::ServerOnly),
-        _ => {
-            warn!("Unknown side value \"{side_str}\" for {mod_id} ({loader})");
-            Err(SieveError::MissingSchemaProperty(format!(
-                "dependencies.{mod_id}[{loader}].side (unknown value: {side_str})"
-            )))
+        if let Some(dep_side) = dep.get("side").and_then(|v| v.as_str()) {
+            match dep_side.to_uppercase().as_str() {
+                "BOTH" => return Ok(Side::ClientAndServer),
+                "CLIENT" => has_client_dep = true,
+                "SERVER" => has_server_dep = true,
+                _ => {
+                    warn!("Unknown side value \"{dep_side}\" for {mod_id} ({dep_id})");
+                    return Err(SieveError::MissingSchemaProperty(format!(
+                        "dependencies.{mod_id}[{dep_id}].side (unknown value: {dep_side})"
+                    )));
+                }
+            }
         }
+    }
+
+    if has_client_dep {
+        if has_server_dep {
+            Ok(Side::ClientAndServer)
+        } else {
+            Ok(Side::ClientOnly)
+        }
+    } else if has_server_dep {
+        Ok(Side::ServerOnly)
+    } else {
+        Err(SieveError::MissingSchemaProperty(format!(
+            "dependencies.{mod_id}[*].side"
+        )))
     }
 }
 
