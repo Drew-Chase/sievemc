@@ -11,4 +11,4 @@ opt-level = "s"
 [workspace.dependencies]
 tracing = { version = "0.1.44" }
 tracing-subscriber = { version = "0.3.23" }
-zip = {version = "8.6.0"}
+zip = {version = "9"}
